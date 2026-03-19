@@ -3,38 +3,50 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QS 통합 비교표 분석기</title>
+  <title>QS 통합 비교표 분석기 (면적 지표 포함)</title>
   <link rel="stylesheet" href="styles.css" />
   <style>
-    /* 비교표 전용 레이아웃 보강 */
+    /* 테이블 레이아웃 및 스크롤 고정용 CSS */
     .excel-view-container {
       overflow: auto;
-      max-height: 80vh;
+      max-height: 75vh;
       border: 1px solid #dcdfe6;
       border-radius: 8px;
+      background: #fff;
+      margin-top: 15px;
     }
     .excel-table {
       border-collapse: separate;
       border-spacing: 0;
-      white-space: nowrap; /* 텍스트 줄바꿈 방지 */
+      white-space: nowrap;
+      width: 100%;
     }
-    /* 헤더 및 첫 두 열 고정 (Sticky) */
+    .excel-table th, .excel-table td {
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+      border-right: 1px solid #eee;
+      font-size: 13px;
+    }
+    /* 헤더 고정 */
     .excel-table thead th {
-      position: sticky;
-      top: 0;
-      z-index: 20;
-      background: #f5f7fa;
-      border-bottom: 2px solid #cfd4db;
+      position: sticky; top: 0; z-index: 20;
+      background: #f8f9fa; border-bottom: 2px solid #cfd4db; font-weight: bold;
     }
+    /* 첫 두 열(층, 구분) 고정 */
     .excel-table td:nth-child(1), .excel-table th:nth-child(1) {
-      position: sticky; left: 0; z-index: 10; background: #fff; border-right: 1px solid #dcdfe6;
+      position: sticky; left: 0; z-index: 10; background: #f1f3f5; border-right: 1px solid #dcdfe6; text-align: center;
     }
     .excel-table td:nth-child(2), .excel-table th:nth-child(2) {
-      position: sticky; left: 80px; z-index: 10; background: #fff; border-right: 2px solid #cfd4db;
+      position: sticky; left: 60px; z-index: 10; background: #fff; border-right: 2px solid #cfd4db; text-align: center; font-weight: bold;
     }
-    .row-group-end td { border-bottom: 2px solid #444 !important; } /* 층별 구분선 */
+    
+    .row-group-end td { border-bottom: 2px solid #444 !important; } /* 1개층(4행) 구분선 */
     .val-zero { color: #ccc; }
     .val-active { color: #000; font-weight: 500; }
+    .val-metric { background: #fff4e6; color: #e67e22; font-weight: bold; text-align: right; }
+    
+    .area-input { width: 100px; text-align: right; padding: 5px; border: 1px solid #ccc; border-radius: 4px;}
+    .area-input:focus { outline: 2px solid var(--orange); }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
@@ -44,25 +56,60 @@
   <div class="app-shell">
     <header class="topbar">
       <div class="topbar__title">
-        <h1>QS 통합 비교표 확인</h1>
-        <p>층별 4행 구성 (레미콘/거푸집/철근D/철근H)</p>
+        <h1>QS 통합 데이터 관리</h1>
+        <p>면적 지표 계산 및 층별 4행(레미콘,거푸집,철근D,철근H) 비교표 형식</p>
       </div>
       <button class="btn btn-ghost" onclick="location.reload()">초기화</button>
     </header>
 
     <main class="page">
       <section class="tabs">
-        <button class="tab is-active" data-tab="upload">1. 파일 업로드</button>
-        <button class="tab" data-tab="view">2. 통합 수량표 확인</button>
+        <button class="tab is-active" data-tab="upload">1. 데이터 업로드</button>
+        <button class="tab" data-tab="mapping">2. 아이템 분류 설정</button>
+        <button class="tab" data-tab="area">3. 면적 대비 지표 계산</button>
+        <button class="tab" data-tab="view">4. 통합 비교표 확인</button>
       </section>
 
       <section id="upload-tab" class="tab-panel is-active">
         <div class="upload-card">
           <input type="file" id="file-main" multiple accept=".xlsx, .csv" hidden />
           <label for="file-main" class="upload-label">
-            <span>QS_통합템플릿_리포트 파일을 선택하세요</span>
+            <span>QS_통합템플릿_리포트 파일을 업로드하세요 (클릭 또는 드래그)</span>
           </label>
           <div id="file-list" class="file-list" style="margin-top:20px;"></div>
+        </div>
+      </section>
+
+      <section id="mapping-tab" class="tab-panel">
+        <div class="panel">
+          <div class="toolbar">
+            <h2>아이템 분류 (4행 구성용)</h2>
+            <button id="btn-apply-mapping" class="btn btn-primary">적용 및 다음</button>
+          </div>
+          <table class="excel-table">
+            <thead>
+              <tr><th>원본 아이템명</th><th>대분류 (행 구분)</th><th>표시 이름</th></tr>
+            </thead>
+            <tbody id="mapping-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="area-tab" class="tab-panel">
+        <div class="panel">
+          <div class="toolbar" style="display:flex; gap:10px; align-items:center;">
+            <label>면적 입력 동 선택:</label>
+            <select id="filter-dong-area" class="input"></select>
+            <button id="btn-save-area" class="btn btn-primary" style="margin-left:auto;">저장 및 결과 확인</button>
+          </div>
+          <div class="excel-view-container">
+            <table class="excel-table">
+              <thead>
+                <tr><th>층</th><th>면적 (m²) 입력</th><th>환산 평수 (Py)</th></tr>
+              </thead>
+              <tbody id="area-body"></tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -70,8 +117,8 @@
         <div class="panel">
           <div class="toolbar">
             <div class="filter-group">
-              <label>동 선택:</label>
-              <select id="filter-dong" class="input" style="width:200px;"></select>
+              <label>결과 확인 동 선택:</label>
+              <select id="filter-dong-view" class="input" style="width:200px;"></select>
             </div>
             <button id="btn-excel" class="btn btn-success" style="margin-left:auto;">비교표 엑셀 다운로드</button>
           </div>
