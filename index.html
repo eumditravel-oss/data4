@@ -3,8 +3,42 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QS 프로젝트 통합 분석기</title>
+  <title>QS 프로젝트 통합 분석기 (비교표 형식)</title>
   <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* 가로로 긴 테이블을 위한 스타일 보완 */
+    .excel-view-container {
+      overflow: auto;
+      max-height: 700px;
+      border: 1px solid var(--line);
+    }
+    .excel-table {
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+    /* 헤더 고정 */
+    .excel-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: #f8f9fa;
+      outline: 1px solid var(--line);
+    }
+    /* 층, 구분 열 고정 */
+    .excel-table th:nth-child(1), .excel-table td:nth-child(1),
+    .excel-table th:nth-child(2), .excel-table td:nth-child(2) {
+      position: sticky;
+      left: 0;
+      z-index: 5;
+      background: #fff;
+      outline: 1px solid var(--line);
+    }
+    .excel-table th:nth-child(1), .excel-table td:nth-child(1) { left: 0; width: 80px; }
+    .excel-table th:nth-child(2), .excel-table td:nth-child(2) { left: 80px; width: 100px; }
+    
+    .row-separator { border-bottom: 2px solid #444 !important; }
+    .cat-label { font-weight: bold; text-align: center; }
+  </style>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
@@ -14,7 +48,7 @@
     <header class="topbar">
       <div class="topbar__title">
         <h1>QS 프로젝트 통합 데이터 관리</h1>
-        <p>전체 동별 수량 집계 및 톤당 루베/면적/평수 3대 지표 분석</p>
+        <p>비교표 형식: 1개층 당 4행(레미콘, 거푸집, 철근D, 철근H) 구성</p>
       </div>
       <div class="topbar__actions">
         <button id="btn-reset" class="btn btn-ghost" onclick="location.reload()">초기화</button>
@@ -25,82 +59,47 @@
       <section class="tabs">
         <button class="tab is-active" data-tab="upload">1. 데이터 업로드</button>
         <button class="tab" data-tab="mapping">2. 아이템 분류 설정</button>
-        <button class="tab" data-tab="area" style="color:var(--orange); border-color:var(--orange);">2-1. 면적 입력</button>
-        <button class="tab" data-tab="view">3. 통합 수량표 확인</button>
+        <button class="tab" data-tab="view">3. 통합 비교표 확인</button>
       </section>
 
-      <section id="tab-upload" class="tab-panel is-active">
-        <div class="panel">
-          <div class="upload-box">
-            <div class="upload-box__icon">📂</div>
-            <h3>분석 데이터 업로드</h3>
-            <p>프로젝트의 모든 층별 총집계표 엑셀 파일을 선택하세요.</p>
-            <label class="filebox">
-              <input type="file" id="file-main" multiple onchange="updateFiles()"/>
-              <span class="filebox__btn">파일 선택</span>
-            </label>
-            <div id="file-list" class="file-list"></div>
-          </div>
-          <button id="btn-parse" class="btn btn-primary" style="width:100%; margin-top:24px; height:56px; font-size: 16px;">데이터 정밀 분석 시작</button>
-          <div id="upload-status" class="status-box"></div>
+      <section id="upload-tab" class="tab-panel is-active">
+        <div class="upload-card">
+          <input type="file" id="file-main" multiple accept=".xlsx, .csv" hidden />
+          <label for="file-main" class="upload-label">
+            <span>파일을 선택하거나 여기에 드래그하세요</span>
+            <small>QS_통합템플릿_리포트.xlsx 등</small>
+          </label>
+          <div id="file-list" class="file-list"></div>
         </div>
       </section>
 
-      <section id="tab-mapping" class="tab-panel">
+      <section id="mapping-tab" class="tab-panel">
         <div class="panel">
           <div class="toolbar">
-            <div class="toolbar__text">
-              <h3>항목 분류 설정</h3>
-              <p>철근(TON), 콘크리트(M3), 거푸집(M2) 분류가 정확한지 검토하세요.</p>
-            </div>
-            <button id="btn-apply" class="btn btn-primary" style="margin-left:auto;">설정 적용 및 면적 입력으로 이동</button>
+            <h2>아이템 매핑 설정</h2>
+            <button id="btn-apply-mapping" class="btn btn-primary">설정 저장 및 분석</button>
           </div>
-          <div class="mapping-container">
-            <div class="list-header">
-              <div class="col-num">번호</div>
-              <div class="col-orig">원본 아이템 명칭</div>
-              <div class="col-edit">표준화 명칭 (수정 가능)</div>
-              <div class="col-cat">중분류</div>
-            </div>
-            <div id="mapping-list" class="mapping-list"></div>
-          </div>
+          <table class="mapping-table">
+            <thead>
+              <tr>
+                <th>원본 아이템명</th>
+                <th>대분류 (비교표 행 구분)</th>
+                <th>표시 이름 (가로 헤더)</th>
+              </tr>
+            </thead>
+            <tbody id="mapping-body"></tbody>
+          </table>
         </div>
       </section>
 
-      <section id="tab-area" class="tab-panel">
-        <div class="panel">
-          <div class="toolbar">
-            <div class="toolbar__text">
-              <h3 style="color:var(--orange);">층별 면적(m²) 입력</h3>
-              <p>각 동/층의 면적을 입력하세요. <br/><strong style="color:var(--primary);">* 엑셀 양식으로 내보내어 정리한 뒤 다시 불러오면 자동으로 값이 채워집니다.</strong></p>
-            </div>
-            <div style="display: flex; gap: 10px; margin-left: auto; align-items: center;">
-              <button id="btn-download-area" class="btn btn-ghost" style="color: #445571; border-color: #d9e1ef;">📥 면적 양식 내보내기</button>
-              <label class="btn btn-ghost" style="cursor: pointer; color: var(--primary); border-color: var(--primary); margin: 0;">
-                📤 면적 양식 불러오기
-                <input type="file" id="file-upload-area" accept=".xlsx, .xls" style="display: none;" />
-              </label>
-              <button id="btn-calc-area" class="btn btn-primary" style="background:var(--orange); margin-left: 10px;">입력 완료 및 수량표 확인</button>
-            </div>
-          </div>
-          <div class="excel-view-container">
-            <table class="excel-table">
-              <thead id="area-head"></thead>
-              <tbody id="area-body"></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <section id="tab-view" class="tab-panel">
-        <div id="dong-summary" class="summary-container"></div>
+      <section id="view-tab" class="tab-panel">
         <div class="panel">
           <div class="toolbar">
             <div class="filter-group">
               <label>조회 동 선택:</label>
-              <select id="filter-dong" class="input" style="width:220px;"></select>
+              <select id="filter-dong" class="input" style="width:200px;"></select>
             </div>
-            <button id="btn-excel" class="btn btn-success" style="margin-left:auto;">템플릿 엑셀 다운로드</button>
+            <button id="btn-excel-download" class="btn btn-success" style="margin-left:auto;">비교표 엑셀 다운로드</button>
           </div>
           <div class="excel-view-container">
             <table id="main-excel-table" class="excel-table">
@@ -113,11 +112,5 @@
     </main>
   </div>
   <script src="app.js"></script>
-  <script>
-    function updateFiles() {
-      const list = document.getElementById('file-list');
-      list.innerHTML = Array.from(document.getElementById('file-main').files).map(f=>`<span class="file-chip">${f.name}</span>`).join('');
-    }
-  </script>
 </body>
 </html>
