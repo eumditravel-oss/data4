@@ -3,53 +3,38 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QS 프로젝트 통합 분석기 (비교표 형식)</title>
+  <title>QS 통합 비교표 분석기</title>
   <link rel="stylesheet" href="styles.css" />
   <style>
-    /* 비교표 형식을 위한 추가 스타일 */
+    /* 비교표 전용 레이아웃 보강 */
     .excel-view-container {
       overflow: auto;
-      max-height: 750px;
-      border: 1px solid var(--line);
+      max-height: 80vh;
+      border: 1px solid #dcdfe6;
       border-radius: 8px;
-      background: #fff;
     }
     .excel-table {
       border-collapse: separate;
       border-spacing: 0;
-      width: 100%;
+      white-space: nowrap; /* 텍스트 줄바꿈 방지 */
     }
-    /* 헤더 고정 (Sticky) */
+    /* 헤더 및 첫 두 열 고정 (Sticky) */
     .excel-table thead th {
       position: sticky;
       top: 0;
-      z-index: 10;
-      background: #f8f9fa;
-      border-bottom: 2px solid var(--line);
-      font-size: 13px;
+      z-index: 20;
+      background: #f5f7fa;
+      border-bottom: 2px solid #cfd4db;
     }
-    /* 1, 2열(층, 구분) 가로 고정 */
-    .excel-table th:nth-child(1), .excel-table td:nth-child(1),
-    .excel-table th:nth-child(2), .excel-table td:nth-child(2) {
-      position: sticky;
-      left: 0;
-      z-index: 5;
-      background: #fff;
-      border-right: 1px solid var(--line);
+    .excel-table td:nth-child(1), .excel-table th:nth-child(1) {
+      position: sticky; left: 0; z-index: 10; background: #fff; border-right: 1px solid #dcdfe6;
     }
-    .excel-table th:nth-child(1), .excel-table td:nth-child(1) { left: 0; width: 80px; }
-    .excel-table th:nth-child(2), .excel-table td:nth-child(2) { left: 80px; width: 100px; }
-    
-    .excel-table td {
-      padding: 10px;
-      font-size: 13px;
-      border-bottom: 1px solid #eee;
+    .excel-table td:nth-child(2), .excel-table th:nth-child(2) {
+      position: sticky; left: 80px; z-index: 10; background: #fff; border-right: 2px solid #cfd4db;
     }
-    .cat-label {
-      font-weight: bold;
-      text-align: center;
-      background-color: #fcfcfc;
-    }
+    .row-group-end td { border-bottom: 2px solid #444 !important; } /* 층별 구분선 */
+    .val-zero { color: #ccc; }
+    .val-active { color: #000; font-weight: 500; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
@@ -59,90 +44,47 @@
   <div class="app-shell">
     <header class="topbar">
       <div class="topbar__title">
-        <h1>QS 프로젝트 통합 데이터 관리</h1>
-        <p>비교표 형식: 층별 4행 구성 (레미콘, 거푸집, 철근D, 철근H)</p>
+        <h1>QS 통합 비교표 확인</h1>
+        <p>층별 4행 구성 (레미콘/거푸집/철근D/철근H)</p>
       </div>
-      <div class="topbar__actions">
-        <button id="btn-reset" class="btn btn-ghost" onclick="location.reload()">초기화</button>
-      </div>
+      <button class="btn btn-ghost" onclick="location.reload()">초기화</button>
     </header>
 
     <main class="page">
       <section class="tabs">
-        <button class="tab is-active" data-tab="upload">1. 데이터 업로드</button>
-        <button class="tab" data-tab="mapping">2. 아이템 분류 설정</button>
-        <button class="tab" data-tab="view">3. 통합 비교표 확인</button>
+        <button class="tab is-active" data-tab="upload">1. 파일 업로드</button>
+        <button class="tab" data-tab="view">2. 통합 수량표 확인</button>
       </section>
 
       <section id="upload-tab" class="tab-panel is-active">
         <div class="upload-card">
           <input type="file" id="file-main" multiple accept=".xlsx, .csv" hidden />
           <label for="file-main" class="upload-label">
-            <span>파일을 선택하거나 드래그하여 업로드하세요</span>
-            <small>QS_통합템플릿_리포트 등 분석할 파일을 선택하세요.</small>
+            <span>QS_통합템플릿_리포트 파일을 선택하세요</span>
           </label>
-          <div id="file-list" class="file-list"></div>
+          <div id="file-list" class="file-list" style="margin-top:20px;"></div>
         </div>
       </section>
 
-      <section id="mapping-tab" class="tab-panel">
-        <div class="panel">
-          <div class="toolbar">
-            <h2>아이템 매핑 및 규격 설정</h2>
-            <button id="btn-apply-mapping" class="btn btn-primary">매핑 설정 저장</button>
-          </div>
-          <div class="table-container">
-            <table class="mapping-table">
-              <thead>
-                <tr>
-                  <th>원본 아이템명</th>
-                  <th>대분류 (4행 구분)</th>
-                  <th>표시 이름 (가로 헤더)</th>
-                </tr>
-              </thead>
-              <tbody id="mapping-body">
-                </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <section id="tab-view" class="tab-panel">
+      <section id="view-tab" class="tab-panel">
         <div class="panel">
           <div class="toolbar">
             <div class="filter-group">
-              <label>조회 동 선택:</label>
-              <select id="filter-dong" class="input" style="width:220px;">
-                <option value="">데이터를 먼저 업로드하세요</option>
-              </select>
+              <label>동 선택:</label>
+              <select id="filter-dong" class="input" style="width:200px;"></select>
             </div>
-            <button id="btn-excel" class="btn btn-success" style="margin-left:auto;">
-              <span class="icon">📊</span> 비교표 엑셀 다운로드
-            </button>
+            <button id="btn-excel" class="btn btn-success" style="margin-left:auto;">비교표 엑셀 다운로드</button>
           </div>
-          
           <div class="excel-view-container">
-            <table id="main-excel-table" class="excel-table">
-              <thead id="table-head">
-                </thead>
-              <tbody id="table-body">
-                </tbody>
+            <table id="main-table" class="excel-table">
+              <thead id="table-head"></thead>
+              <tbody id="table-body"></tbody>
             </table>
           </div>
         </div>
       </section>
     </main>
   </div>
-
   <script src="app.js"></script>
-  <script>
-    // 파일 선택 시 리스트 표시 유틸리티
-    document.getElementById('file-main').addEventListener('change', function() {
-      const list = document.getElementById('file-list');
-      list.innerHTML = Array.from(this.files)
-        .map(f => `<div class="file-item">📄 ${f.name} (${(f.size/1024).toFixed(1)} KB)</div>`)
-        .join('');
-    });
-  </script>
 </body>
 </html>
