@@ -1,0 +1,80 @@
+:root {
+  --bg: #f5f7fb; --panel: #ffffff; --line: #d9e1ef; --text: #10233f;
+  --muted: #6a7890; --primary: #1f5eff; --primary-weak: #eaf1ff;
+  --orange: #e67e22; --success: #10b981; --shadow: 0 10px 24px rgba(16,35,63,.06); --radius: 18px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: "Pretendard", sans-serif; padding: 24px; line-height: 1.5; }
+
+.app-shell { max-width: 1600px; margin: 0 auto; }
+.topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+.topbar h1 { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+
+.tabs { display: flex; gap: 10px; margin-bottom: 24px; }
+.tab { padding: 14px 28px; border-radius: 99px; border: 1px solid var(--line); background: #fff; cursor: pointer; font-weight: 700; transition: 0.2s; color: var(--muted); }
+.tab.is-active { background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: 0 6px 15px rgba(31,94,255,0.3); }
+
+.panel { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 30px; margin-bottom: 20px; }
+.tab-panel { display: none; }
+.tab-panel.is-active { display: block; }
+
+.upload-box { border: 2px dashed var(--line); padding: 60px 20px; text-align: center; border-radius: var(--radius); background: #fbfcff; }
+.upload-box__icon { font-size: 48px; margin-bottom: 15px; }
+.filebox input { display: none; }
+.filebox__btn { padding: 12px 32px; background: #fff; border: 2px solid var(--primary); color: var(--primary); border-radius: 10px; cursor: pointer; font-weight: 800; display: inline-block; }
+.file-chip { display: inline-block; padding: 6px 14px; background: var(--primary-weak); color: var(--primary); border-radius: 20px; font-size: 12px; margin: 5px; font-weight: 700; border: 1px solid var(--line); }
+
+.mapping-container { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.list-header { display: flex; align-items: center; background: #f4f7fd; padding: 15px; font-weight: 800; color: #445571; border-bottom: 2px solid var(--line); }
+.mapping-list { max-height: 500px; overflow-y: auto; }
+
+/* ★ 2번 탭 아이템 분류 행 배경색 (수정됨) ★ */
+.item-row { display: flex; align-items: center; padding: 12px 15px; border-bottom: 1px solid var(--line); gap: 15px; transition: background-color 0.2s ease; }
+.item-row.cat-콘크리트 { background-color: #eef4ff; }
+.item-row.cat-철근 { background-color: #f0fcf4; }
+.item-row.cat-거푸집 { background-color: #fff9ec; }
+.item-row.cat-etc { background-color: #ffffff; }
+
+.item-row.cat-콘크리트:hover { background-color: #dbe8ff; }
+.item-row.cat-철근:hover { background-color: #dcf5e4; }
+.item-row.cat-거푸집:hover { background-color: #fff0cc; }
+.item-row.cat-etc:hover { background-color: #f9fbff; }
+
+.col-num { width: 60px; text-align: center; font-weight: bold; color: var(--muted); }
+.col-orig { flex: 1; font-weight: 700; color: var(--text); }
+.col-edit { width: 250px; }
+.col-cat { width: 180px; }
+
+.excel-view-container { overflow: auto; margin-top: 20px; border: 1px solid var(--line); border-radius: 12px; max-height: 600px; }
+.excel-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; min-width: 1000px; }
+.excel-table thead { position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 0 var(--line); }
+.excel-table th, .excel-table td { border: 0.5px solid var(--line); padding: 12px 10px; text-align: center; white-space: nowrap; }
+.excel-table th { background: #f4f7fd; font-weight: 800; color: #445571; background-clip: padding-box; }
+.excel-table tr:hover td { background: #f9fbff; }
+
+/* ★ 3번 탭 수량표 행 배경색 ★ */
+.row-cat-콘크리트 td { background-color: #eef4ff !important; }
+.row-cat-철근 td { background-color: #f0fcf4 !important; }
+.row-cat-거푸집 td { background-color: #fff9ec !important; }
+.row-cat-etc td { background-color: #ffffff !important; }
+
+.row-cat-콘크리트:hover td { background-color: #dbe8ff !important; }
+.row-cat-철근:hover td { background-color: #dcf5e4 !important; }
+.row-cat-거푸집:hover td { background-color: #fff0cc !important; }
+.row-cat-etc:hover td { background-color: #f9fbff !important; }
+
+.row-subtotal td { background: #f1f3f5 !important; font-weight: 800; color: #10233f; }
+.row-ratio td { background: #fff4e6 !important; font-weight: 800; color: var(--orange); }
+.col-total { background: #f8f9fa; font-weight: 800; color: var(--primary); }
+
+.area-input { width: 100%; box-sizing: border-box; border: none; background: transparent; text-align: right; font-size: 14px; font-weight: bold; outline: none; padding: 5px; color: var(--primary); }
+.area-input:focus { background: #fffde7; outline: 2px solid var(--orange); border-radius: 4px; }
+.area-input::placeholder { color: #ccc; font-weight: normal; }
+
+.btn { padding: 14px 24px; border-radius: 12px; border: none; font-weight: 800; cursor: pointer; transition: 0.2s; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-success { background: var(--success); color: #fff; }
+.btn-ghost { background: #fff; border: 1px solid var(--line); }
+.toolbar { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; }
+.input { padding: 12px 16px; border: 1px solid var(--line); border-radius: 10px; outline: none; width: 100%; }
+.input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(31,94,255,0.1); }
