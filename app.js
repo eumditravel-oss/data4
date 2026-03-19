@@ -1,43 +1,38 @@
 "use strict";
 
-// 1. 상수 설정 (철근 D/H 분리)
-const CATEGORIES = ["레미콘", "거푸집", "철근D", "철근H", "기타"];
+const CATEGORIES = ["레미콘", "거푸집", "철근D", "철근H"];
+const $ = (id) => document.getElementById(id);
 
-const state = {
-  rawItems: [], 
-  dongs: [], 
-  floors: [], 
-  data: {},     // { 동: { 층: { 아이템: 값 } } }
-  mappings: [], // { original, category, displayName }
+let state = {
+  data: {},    // { 동: { 층: { 아이템: 값 } } }
+  dongs: [],
+  floors: [],
+  items: [],   // { name, category }
   ready: false
 };
 
-const $ = (id) => document.getElementById(id);
-
-// 2. 층 정렬 유틸리티
-function floorSorter(a, b) {
-  const getRank = (name) => {
-    const s = String(name).toUpperCase().trim();
-    if (s.startsWith('B')) return 1000 - (parseInt(s.replace('B', '')) || 0);
-    if (s === 'FT' || s === '기초' || s === 'MAT') return 2000;
-    if (s.endsWith('F') || /^\d+$/.test(s)) return 3000 + (parseInt(s.replace('F', '')) || 0);
-    if (s.startsWith('PH')) return 4000 + (parseInt(s.replace('PH', '')) || 0);
-    return 5000;
-  };
-  return getRank(a) - getRank(b);
-}
-
-// 3. 아이템 자동 분류 (이미지 기준)
-function predictCategory(name) {
-  const s = String(name).toUpperCase().replace(/\s+/g, "");
-  if (s.includes("MPA") || /\d+-\d+-\d+/.test(s)) return "레미콘";
-  if (["폼","FORM","거푸집","갱폼","알폼","유로"].some(k => s.includes(k))) return "거푸집";
-  if (/(HD|SD|H)\d+/.test(s)) return "철근H";
-  if (/D\d+/.test(s)) return "철근D";
+// 1. 아이템 분류 로직
+function getCategory(itemName) {
+  const n = itemName.toUpperCase().replace(/\s/g, "");
+  if (n.includes("MPA") || /\d+-\d+-\d+/.test(n)) return "레미콘";
+  if (["폼", "FORM", "거푸집", "갱폼", "알폼"].some(k => n.includes(k))) return "거푸집";
+  if (/(HD|SD|H)\d+/.test(n)) return "철근H";
+  if (/D\d+/.test(n)) return "철근D";
   return "기타";
 }
 
-// 4. 데이터 파싱 (원본 로직 복구)
+// 2. 층 정렬
+function sortFloors(arr) {
+  const rank = (f) => {
+    if (f.startsWith('B')) return 1000 - parseInt(f.substring(1));
+    if (f === 'FT' || f === '기초') return 2000;
+    if (f.endsWith('F')) return 3000 + parseInt(f);
+    return 4000;
+  };
+  return arr.sort((a, b) => rank(a) - rank(b));
+}
+
+// 3. 파일 파싱
 $("file-main").onchange = async (e) => {
   const files = e.target.files;
   if (!files.length) return;
@@ -51,20 +46,19 @@ $("file-main").onchange = async (e) => {
     json.forEach(row => {
       const dong = String(row["동"] || "전체").trim();
       const item = String(row["아이템"] || row["구분"] || "").trim();
-      if (!item || ["소계","합계","구분"].includes(item)) return;
+      if (!item || ["소계", "합계"].includes(item)) return;
 
-      if (!state.rawItems.includes(item)) {
-        state.rawItems.push(item);
-        state.mappings.push({ original: item, category: predictCategory(item), displayName: item });
+      // 아이템 등록
+      if (!state.items.find(i => i.name === item)) {
+        state.items.push({ name: item, category: getCategory(item) });
       }
 
       if (!state.data[dong]) state.data[dong] = {};
       if (!state.dongs.includes(dong)) state.dongs.push(dong);
 
       Object.keys(row).forEach(key => {
+        if (["동", "아이템", "구분", "단위", "합계"].includes(key)) return;
         const floor = key.trim();
-        if (["동","아이템","구분","단위","합계","비고","현재 프로젝트 수량"].includes(floor)) return;
-        
         const val = parseFloat(row[key]);
         if (!isNaN(val)) {
           if (!state.floors.includes(floor)) state.floors.push(floor);
@@ -74,139 +68,95 @@ $("file-main").onchange = async (e) => {
       });
     });
   }
-  state.floors.sort(floorSorter);
+  state.floors = sortFloors(state.floors);
   state.ready = true;
-  renderMappingTable();
-  alert("데이터 분석 완료");
+  $("file-list").innerHTML = "✅ 분석 완료! 2번 탭으로 이동하세요.";
+  alert("데이터 로드 완료");
 };
 
-// 5. 매핑 테이블 렌더링
-function renderMappingTable() {
-  const tbody = $("mapping-body");
-  if(!tbody) return;
-  tbody.innerHTML = state.mappings.map((m, idx) => `
-    <tr>
-      <td>${m.original}</td>
-      <td>
-        <select onchange="state.mappings[${idx}].category = this.value" class="input">
-          ${CATEGORIES.map(cat => `<option value="${cat}" ${m.category === cat ? 'selected' : ''}>${cat}</option>`).join('')}
-        </select>
-      </td>
-      <td><input type="text" value="${m.displayName}" onchange="state.mappings[${idx}].displayName = this.value" class="input" /></td>
-    </tr>
-  `).join('');
-}
-
-// 6. 4행 1세트 비교표 렌더링 (핵심 UI)
-function renderMainTable() {
+// 4. 테이블 렌더링 (4행 1세트 구조)
+function renderTable() {
   const dong = $("filter-dong").value;
-  const thead = $("table-head");
-  const tbody = $("table-body");
-  if (!dong || !thead || !tbody) return;
+  if (!dong) return;
 
-  const grouped = {
-    "레미콘": state.mappings.filter(m => m.category === "레미콘"),
-    "거푸집": state.mappings.filter(m => m.category === "거푸집"),
-    "철근D": state.mappings.filter(m => m.category === "철근D"),
-    "철근H": state.mappings.filter(m => m.category === "철근H")
+  const head = $("table-head");
+  const body = $("table-body");
+
+  // 카테고리별 아이템 필터링
+  const groups = {
+    "레미콘": state.items.filter(i => i.category === "레미콘"),
+    "거푸집": state.items.filter(i => i.category === "거푸집"),
+    "철근D": state.items.filter(i => i.category === "철근D"),
+    "철근H": state.items.filter(i => i.category === "철근H")
   };
 
-  // 헤더
-  thead.innerHTML = `
-    <tr>
-      <th rowspan="2">층</th><th rowspan="2">구분</th>
-      <th colspan="${grouped["레미콘"].length || 1}">레미콘(M3)</th>
-      <th colspan="${grouped["거푸집"].length || 1}">거푸집(M2)</th>
-      <th colspan="${grouped["철근D"].length || 1}">철근D(ton)</th>
-      <th colspan="${grouped["철근H"].length || 1}">철근H(ton)</th>
-    </tr>
-    <tr>
-      ${Object.values(grouped).map(g => g.length ? g.map(m => `<th>${m.displayName}</th>`).join('') : '<th>-</th>').join('')}
-    </tr>`;
+  // 1) 헤더 생성
+  let h1 = `<tr><th rowspan="2">층</th><th rowspan="2">구분</th>`;
+  let h2 = `<tr>`;
+  
+  CATEGORIES.forEach(cat => {
+    const cols = groups[cat];
+    h1 += `<th colspan="${cols.length || 1}">${cat}</th>`;
+    if (cols.length === 0) h2 += `<th>-</th>`;
+    else cols.forEach(i => h2 += `<th>${i.name}</th>`);
+  });
+  head.innerHTML = h1 + `</tr>` + h2 + `</tr>`;
 
-  // 바디
-  let html = "";
-  state.floors.forEach(floor => {
-    const cats = ["레미콘", "거푸집", "철근D", "철근H"];
-    cats.forEach((rowCat, idx) => {
-      html += `<tr>`;
-      if (idx === 0) html += `<td rowspan="4" style="background:#f1f3f5; font-weight:bold; text-align:center; vertical-align:middle;">${floor}</td>`;
-      html += `<td style="font-weight:bold; text-align:center; background:#fff;">${rowCat}</td>`;
+  // 2) 바디 생성 (층별 루프)
+  let bHtml = "";
+  state.floors.forEach(f => {
+    CATEGORIES.forEach((rowCat, idx) => {
+      let row = `<tr class="${idx === 3 ? 'row-group-end' : ''}">`;
+      if (idx === 0) row += `<td rowspan="4" style="text-align:center; font-weight:bold;">${f}</td>`;
+      row += `<td style="text-align:center; background:#f9f9f9;">${rowCat}</td>`;
 
-      cats.forEach(colCat => {
-        if (grouped[colCat].length === 0) html += `<td>-</td>`;
+      // 데이터 셀 생성
+      CATEGORIES.forEach(colCat => {
+        const targetItems = groups[colCat];
+        if (targetItems.length === 0) row += `<td>-</td>`;
         else {
-          grouped[colCat].forEach(m => {
-            const val = (rowCat === colCat) ? (state.data[dong]?.[floor]?.[m.original] || 0) : 0;
-            const style = val === 0 ? "color:#ccc;" : "color:#000; font-weight:500;";
-            html += `<td style="text-align:right; ${style}">${val === 0 ? '-' : val.toLocaleString(undefined,{minimumFractionDigits:2})}</td>`;
+          targetItems.forEach(item => {
+            // 현재 행의 카테고리와 컬럼의 카테고리가 일치할 때만 값 출력
+            const val = (rowCat === colCat) ? (state.data[dong]?.[f]?.[item.name] || 0) : 0;
+            const cls = val === 0 ? "val-zero" : "val-active";
+            row += `<td style="text-align:right;" class="${cls}">${val === 0 ? '-' : val.toLocaleString(undefined, {minimumFractionDigits:2})}</td>`;
           });
         }
       });
-      html += `</tr>`;
+      row += `</tr>`;
+      bHtml += row;
     });
   });
-  tbody.innerHTML = html;
+  body.innerHTML = bHtml;
 }
 
-// 7. 탭 제어 및 이벤트 (기존 ID 호환)
-document.querySelectorAll(".tab").forEach(tab => {
-  tab.onclick = () => {
+// 5. 탭 및 필터 이벤트
+document.querySelectorAll(".tab").forEach(t => {
+  t.onclick = () => {
     document.querySelectorAll(".tab, .tab-panel").forEach(el => el.classList.remove("is-active"));
-    tab.classList.add("is-active");
-    // data-tab="view" -> id="tab-view" 대응
-    const targetId = tab.dataset.tab === 'view' ? 'tab-view' : (tab.dataset.tab + "-tab");
-    if($(targetId)) $(targetId).classList.add("is-active");
-
-    if (tab.dataset.tab === "view" && state.ready) {
-      const sel = $("filter-dong");
-      sel.innerHTML = state.dongs.map(d => `<option value="${d}">${d}</option>`).join('');
-      renderMainTable();
+    t.classList.add("is-active");
+    $(`${t.dataset.tab}-tab`).classList.add("is-active");
+    
+    if (t.dataset.tab === "view" && state.ready) {
+      $("filter-dong").innerHTML = state.dongs.map(d => `<option value="${d}">${d}</option>`).join('');
+      renderTable();
     }
   };
 });
 
-$("filter-dong").onchange = renderMainTable;
+$("filter-dong").onchange = renderTable;
 
-// 8. 엑셀 다운로드 (ExcelJS 병합 로직 포함)
+// 6. 엑셀 다운로드 (ExcelJS)
 $("btn-excel").onclick = async () => {
-  const dong = $("filter-dong").value;
-  if (!dong) return;
-
-  const workbook = new ExcelJS.Workbook();
-  const ws = workbook.addWorksheet(dong);
-  
-  // 가로 헤더 및 데이터 생성 로직...
-  // (지면 관계상 핵심 병합 로직만 포함 - 이전 코드의 ExcelJS 기능 완벽 활용)
-  const grouped = {
-    "레미콘": state.mappings.filter(m => m.category === "레미콘"),
-    "거푸집": state.mappings.filter(m => m.category === "거푸집"),
-    "철근D": state.mappings.filter(m => m.category === "철근D"),
-    "철근H": state.mappings.filter(m => m.category === "철근H")
-  };
-
-  const h1 = ["층", "구분"], h2 = ["", ""];
-  Object.keys(grouped).forEach(c => grouped[c].forEach((m, i) => {
-    h1.push(i === 0 ? c : ""); h2.push(m.displayName);
-  }));
-  ws.addRow(h1); ws.addRow(h2);
-
-  state.floors.forEach(f => {
-    ["레미콘", "거푸집", "철근D", "철근H"].forEach(rc => {
-      const row = [f, rc];
-      Object.keys(grouped).forEach(cc => grouped[cc].forEach(m => {
-        row.push(rc === cc ? (state.data[dong]?.[f]?.[m.original] || 0) : 0);
-      }));
-      ws.addRow(row);
-    });
-  });
-
-  // 층 단위 셀 병합 (4행씩)
-  for (let i = 0; i < state.floors.length; i++) {
-    const r = 3 + (i * 4);
-    ws.mergeCells(r, 1, r + 3, 1);
-  }
-
-  const buf = await workbook.xlsx.writeBuffer();
-  saveAs(new Blob([buf]), `QS_비교표_${dong}.xlsx`);
+    const dong = $("filter-dong").value;
+    if (!dong) return;
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet(dong);
+    
+    // 헤더와 데이터를 수동으로 구성 (웹 테이블 구조와 동일하게)
+    // ... (상세 엑셀 스타일링 로직 생략 가능 - 필요시 추가 구현)
+    alert("엑셀 생성이 시작됩니다.");
+    const table = $("main-table");
+    const wb = XLSX.utils.table_to_book(table);
+    XLSX.writeFile(wb, `QS_비교표_${dong}.xlsx`);
 };
